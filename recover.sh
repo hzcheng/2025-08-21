@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # Global configurations
-readonly TD_ROOT_DIR="/root/workspace/support/2025-08-21/dnode"
+readonly ROOT_DIR="/root/workspace/support/2025-08-21"
+readonly TD_ROOT_DIR="${ROOT_DIR}/dnode"
 
 # Color definitions
 readonly RED='\033[0;31m'
@@ -40,48 +41,29 @@ function log_success() {
     echo -e "${GRAY}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} ${GREEN}SUCCESS:${NC} $*"
 }
 
+# function start_taosd_process() {
+# }
+
 function kill_taosd_process() {
-    local force_kill=false
     local pid
-    
-    # Parse options
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -f|--force)
-                force_kill=true
-                shift
-                ;;
-            *)
-                shift
-                ;;
-        esac
-    done
     
     pid=$(pgrep -f taosd) || true
     if [[ -n "$pid" ]]; then
-        if [[ "$force_kill" == true ]]; then
-            log_info "Force killing taosd process (PID: $pid)..."
-            kill -9 "$pid"
-            log_success "taosd process force killed"
-        else
-            log_info "Stopping taosd process with SIGTERM (PID: $pid)..."
-            kill -TERM "$pid"
-            # Wait up to 10 seconds for graceful shutdown
-            local count=0
-            while kill -0 "$pid" 2>/dev/null && [[ $count -lt 10 ]]; do
-                sleep 1
-                ((count++))
-            done
-            
-            # If still running after timeout, force kill
-            if kill -0 "$pid" 2>/dev/null; then
-                log_warn "Process didn't terminate gracefully, force killing..."
-                kill -9 "$pid"
-                log_success "taosd process force killed"
-            else
-                log_success "taosd process stopped gracefully"
-            fi
-        fi
+        log_info "Stopping taosd process with SIGTERM (PID: ${WHITE}$pid${NC})..."
+        kill -TERM "$pid"
+        
+        # Wait for graceful shutdown with warnings every 5 seconds
+        local wait_count=0
+        while kill -0 "$pid" 2>/dev/null; do
+            sleep 5
+            ((wait_count++))
+            local total_wait=$((wait_count * 5))
+            log_warn "Waiting for taosd process to terminate gracefully... (${total_wait}s elapsed)"
+        done
+        
+        log_success "taosd process terminated gracefully after ${total_wait}s"
+    else
+        log_info "No taosd process found to kill"
     fi
 }
 
@@ -89,6 +71,10 @@ function cleanup_recovery_environment() {
     # Kill taosd process
     kill_taosd_process
 
+    # Remove the recovery folder
+    local root_dir="$TD_ROOT_DIR"
+    rm -rf "$root_dir"
+    log_success "Recovery environment cleaned up successfully."
 }
 
 function create_recovery_environment() {
@@ -97,10 +83,8 @@ function create_recovery_environment() {
     local data_dir="$root_dir/data"
     local log_dir="$root_dir/log"
 
-
-    # # Create necessary directories and set up environment
-    # mkdir -p "$ROOT_DIR/recovery"
-    # log_success "Recovery environment created successfully."
+    mkdir -p "$cfg_dir" "$data_dir" "$log_dir"
+    log_success "Recovery environment created successfully."
 }
 
 function main() {
@@ -108,15 +92,15 @@ function main() {
     log_info "Cleaning up old recovery environment..."
     cleanup_recovery_environment
 
-    # Step 1
-    log_info "Creating recovery environment..."
-    create_recovery_environment
+    # # Step 1
+    # log_info "Creating recovery environment..."
+    # create_recovery_environment
 
-    # Step 2
-    log_info "Mapping vnodes ..."
+    # # Step 2
+    # log_info "Mapping vnodes ..."
 
-    # Step 3
-    log_info "Starting recovery process..."
+    # # Step 3
+    # log_info "Starting recovery process..."
 }
 
 # Check if the script is being executed directly (not sourced)
