@@ -160,14 +160,15 @@ function kill_taosd_process() {
     pid=$(pgrep -f taosd) || true
     if [[ -n "$pid" ]]; then
         log_info "Stopping taosd process with SIGTERM (PID: ${WHITE}$pid${NC})..."
-        kill -TERM "$pid"
+        kill -TERM "$pid" || true
         
         # Wait for graceful shutdown with warnings every 5 seconds
         local wait_count=0
+        local total_wait=0
         while kill -0 "$pid" 2>/dev/null; do
             sleep 5
             ((wait_count++))
-            local total_wait=$((wait_count * 5))
+            total_wait=$((wait_count * 5))
             log_warn "Waiting for taosd process to terminate gracefully... (${total_wait}s elapsed)"
         done
         
@@ -276,8 +277,8 @@ function create_database() {
     
     log_info "Creating database with $vgroups vgroups..."
     
-    # Create database using TDengine CLI
-    if ! "$TAOS" -s "CREATE DATABASE yzs1 BUFFER 256 CACHESIZE 50 CACHEMODEL 'both' COMP 2 DURATION 14400m WAL_FSYNC_PERIOD 3000 MAXROWS 4096 MINROWS 100 STT_TRIGGER 2 KEEP 1080000m,1080000m,1080000m PAGES 256 PAGESIZE 4 PRECISION 'ms' REPLICA 1 WAL_LEVEL 1 VGROUPS $vgroups SINGLE_STABLE 0 TABLE_PREFIX 0 TABLE_SUFFIX 0 TSDB_PAGESIZE 4 WAL_RETENTION_PERIOD 3600 WAL_RETENTION_SIZE 0;"; then
+    # Create database using TDengine CLI with ASAN options
+    if ! ASAN_OPTIONS=detect_odr_violation=0 "$TAOS" -c ${TD_ROOT_DIR}/cfg -s "CREATE DATABASE yzs1 BUFFER 256 CACHESIZE 50 CACHEMODEL 'both' COMP 2 DURATION 14400m WAL_FSYNC_PERIOD 3000 MAXROWS 4096 MINROWS 100 STT_TRIGGER 2 KEEP 1080000m,1080000m,1080000m PAGES 256 PAGESIZE 4 PRECISION 'ms' REPLICA 1 WAL_LEVEL 1 VGROUPS $vgroups SINGLE_STABLE 0 TABLE_PREFIX 0 TABLE_SUFFIX 0 TSDB_PAGESIZE 4 WAL_RETENTION_PERIOD 3600 WAL_RETENTION_SIZE 0;"; then
         log_error "Failed to create database"
         return 1
     fi
@@ -300,8 +301,10 @@ function create_recovery_environment() {
     log_info "Starting taosd process..."
     start_taosd_process --cfg_dir="$cfg_dir"
 
+    sleep 5
+
     log_info "Creating database..."
-    create_database --vgroups=1
+    create_database --vgroups=12
 
     log_success "Recovery environment created successfully."
 }
