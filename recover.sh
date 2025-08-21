@@ -2,10 +2,7 @@
 set -euo pipefail
 
 # Global configurations
-readonly ROOT_DIR="/root/workspace/support/2025-08-21"
-readonly TD_ROOT_DIR="${ROOT_DIR}/dnode"
-readonly TAOSD="/root/workspace/TDinternal/debug/build/bin/taosd"
-readonly TAOS="/root/workspace/TDinternal/debug/build/bin/taos"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 # Color definitions
 readonly RED='\033[0;31m'
@@ -304,7 +301,12 @@ function create_recovery_environment() {
     sleep 5
 
     log_info "Creating database..."
-    create_database --vgroups=12
+    create_database --vgroups=1
+
+    sleep 5
+
+    log_info "Stopping taosd process..."
+    kill_taosd_process
 
     log_success "Recovery environment created successfully."
 }
